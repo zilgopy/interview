@@ -41,7 +41,7 @@ jobs:
         sudo -u postgres psql postgres -c "CREATE DATABASE interview;"
         sudo -u postgres psql postgres -c "CREATE USER zhong WITH PASSWORD 'p@ssword';"
         sudo -u postgres psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE interview TO zhong;"
-        sudo -u postgres psql postgres -c "  CREATE TABLE $TABLE_NAME (
+        sudo -u postgres psql postgres -c "  CREATE TABLE query_history (
         id SERIAL PRIMARY KEY,
         client_ip VARCHAR(255),
         domain VARCHAR(255),
