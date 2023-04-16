@@ -66,9 +66,9 @@ jobs:
 
     - name: Lint Helm chart
       run: |
-        helm lint your_chart_directory
+        helm lint helm-interview
 
     - name: Package Helm chart
       run: |
-        helm package your_chart_directory
+        helm package helm-interview
 
