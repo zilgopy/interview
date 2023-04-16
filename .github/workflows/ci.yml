@@ -26,8 +26,39 @@ jobs:
       with:
         version: v1.42.1
 
+    - name: Install PostgreSQL
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y postgresql curl
+
+    - name: Start PostgreSQL
+      run: |
+        sudo service postgresql start
+
+     - name: Configure PostgreSQL
+      run: |
+        sudo -u postgres psql -c "CREATE DATABASE interview;"
+        sudo -u postgres psql -c "CREATE USER user WITH PASSWORD 'p@ssword';"
+        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE interview TO user;"
+        sudo -u postgres psql -c "  CREATE TABLE $TABLE_NAME (
+        id SERIAL PRIMARY KEY,
+        client_ip VARCHAR(255),
+        domain VARCHAR(255),
+        created_at TIMESTAMP,
+        addresses JSONB
+        );"
+
     - name: Run tests
-      run: go run main.go
+      run: |
+        go run main.go &
+        sleep 3
+        curl localhost:3000/health
+      env:
+        DB_HOST: localhost
+        DB_PORT: 5432
+        DB_NAME: interview
+        DB_USER: user
+        DB_PASSWORD: p@ssword
 
   build-docker-image:
     runs-on: ubuntu-latest
