@@ -37,10 +37,11 @@ jobs:
 
     - name: Configure PostgreSQL
       run: |
-        psql -U postgres -c "CREATE DATABASE interview;"
-        psql -U postgres -c "CREATE USER zhong WITH PASSWORD 'p@ssword';"
-        psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE interview TO zhong;"
-        psql -U postgres -c "  CREATE TABLE $TABLE_NAME (
+        cd /tmp
+        sudo -u postgres psql postgres -c "CREATE DATABASE interview;"
+        sudo -u postgres psql postgres -c "CREATE USER zhong WITH PASSWORD 'p@ssword';"
+        sudo -u postgres psql postgres -c "GRANT ALL PRIVILEGES ON DATABASE interview TO zhong;"
+        sudo -u postgres psql postgres -c "  CREATE TABLE $TABLE_NAME (
         id SERIAL PRIMARY KEY,
         client_ip VARCHAR(255),
         domain VARCHAR(255),
