@@ -37,10 +37,10 @@ jobs:
 
     - name: Configure PostgreSQL
       run: |
-        sudo -u postgres psql -c "CREATE DATABASE interview;"
-        sudo -u postgres psql -c "CREATE USER user WITH PASSWORD 'p@ssword';"
-        sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE interview TO user;"
-        sudo -u postgres psql -c "  CREATE TABLE $TABLE_NAME (
+        psql -U postgres -c "CREATE DATABASE interview;"
+        psql -U postgres -c "CREATE USER zhong WITH PASSWORD 'p@ssword';"
+        psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE interview TO zhong;"
+        psql -U postgres -c "  CREATE TABLE $TABLE_NAME (
         id SERIAL PRIMARY KEY,
         client_ip VARCHAR(255),
         domain VARCHAR(255),
@@ -57,7 +57,7 @@ jobs:
         DB_HOST: localhost
         DB_PORT: 5432
         DB_NAME: interview
-        DB_USER: user
+        DB_USER: zhong
         DB_PASSWORD: p@ssword
 
   build-docker-image:
