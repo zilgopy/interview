@@ -1,0 +1,32 @@
+app:
+  name: interview
+  replicaCount: 1
+  image:
+    repository: zilgopy/interview
+    tag: v1.0
+  service:
+    type: NodePort
+    port: 3000
+db:
+  name: postgres
+  replicaCount: 1
+  image:
+    repository: postgres
+    tag: 13
+  service:
+    type: ClusterIP
+    port: "5432"
+  env:
+    postgresUser: user
+    postgresPassword: p@ssword
+    postgresDb: interview
+    table: query_history
+  initScript: "files/initdb.sh"
+  storageSize: 1Gi
+  storageClass: my-storage-class
+
+global: {}
+
+ingress: {}
+
+

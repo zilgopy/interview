@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{.Values.app.name }}-initdb-config
+data:
+  initdb.sh: |-
+{{ .Files.Get .Values.db.initScript | indent 4 }}
