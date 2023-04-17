@@ -103,16 +103,15 @@ func validateIPHandler(w http.ResponseWriter, r *http.Request) {
 
 //lookup Handler definition
 
-type LookupResponse struct {
-	Addresses []net.IP `json:"addresses"`
-	Domain    string   `json:"domain"`
+type Addr struct {
+	Ip net.IP `json:"ip"`
 }
 
-type QueryHistory struct {
-	Domain    string   `json:"domain"`
-	ClientIP  string   `json:"client_ip"`
-	Addresses []net.IP `json:"addresses"`
-	CreatedAt int64    `json:"created_at"`
+type LookupResponse struct {
+	Addresses []Addr `json:"addresses"`
+	Domain    string `json:"domain"`
+	CreatedAt int64  `json:"created_at"`
+	Client_ip string `json:"client_ip"`
 }
 
 func lookupHandler(db *sql.DB) http.HandlerFunc {
@@ -146,16 +145,21 @@ func lookupHandler(db *sql.DB) http.HandlerFunc {
 			log.Printf("%s: Failed to resolve domain %s with error %s\n", domain, r.RemoteAddr, err)
 			return
 		}
-
+		remoteip, _, _ := net.SplitHostPort(r.RemoteAddr)
 		response := LookupResponse{
-			Addresses: ips,
+			Addresses: make([]Addr, 0),
 			Domain:    domain,
+			CreatedAt: time.Now().Unix(),
+			Client_ip: remoteip,
 		}
-		clientIP := r.RemoteAddr
-		createdAt := time.Now().Unix()
+
+		for _, ip := range ips {
+			response.Addresses = append(response.Addresses, Addr{Ip: ip})
+		}
 		addressJson, err := json.Marshal(response.Addresses)
-		log.Printf("%s: Inserting database entry [domain: %s,clientIP: %s,addressJson: %s,createaAt: %d].\n", r.RemoteAddr, domain, clientIP, addressJson, createdAt)
-		_, err = db.Exec(`INSERT INTO query_history (domain, client_ip, addresses, created_at) VALUES ($1, $2, $3, to_timestamp($4))`, domain, clientIP, addressJson, createdAt)
+
+		log.Printf("%s: Inserting database entry [domain: %s,clientIP: %s,addressJson: %s,createAt: %s].\n", response.Domain, response.Client_ip, response.Addresses, response.CreatedAt)
+		_, err = db.Exec(`INSERT INTO query_history (domain, client_ip, addresses, created_at) VALUES ($1, $2, $3, to_timestamp($4))`, response.Domain, response.Client_ip, addressJson, response.CreatedAt)
 
 		if err != nil {
 
@@ -169,7 +173,7 @@ func lookupHandler(db *sql.DB) http.HandlerFunc {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
-		log.Printf("%s: Respond to request %s with lookup response %s.\n", r.RemoteAddr, r.URL.Path, response)
+		log.Printf("%s: Respond to request %s with lookup response %v.\n", r.RemoteAddr, r.URL.Path, response)
 	}
 }
 
@@ -197,12 +201,12 @@ func historyHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
-		history := make([]QueryHistory, 0)
+		QueryHistory := make([]LookupResponse, 0)
 		for rows.Next() {
-			var qh QueryHistory
+			var qh LookupResponse
 			var addressesJSON string
 			t := time.Time{}
-			err := rows.Scan(&qh.Domain, &qh.ClientIP, &addressesJSON, &t)
+			err := rows.Scan(&qh.Domain, &qh.Client_ip, &addressesJSON, &t)
 			if err != nil {
 				msg := httpError{Message: "Failed to decode database row."}
 				w.WriteHeader(http.StatusInternalServerError)
@@ -212,7 +216,7 @@ func historyHandler(db *sql.DB) http.HandlerFunc {
 			}
 			qh.CreatedAt = t.Unix()
 			json.Unmarshal([]byte(addressesJSON), &qh.Addresses)
-			history = append(history, qh)
+			QueryHistory = append(QueryHistory, qh)
 
 		}
 		if err = rows.Err(); err != nil {
@@ -225,8 +229,8 @@ func historyHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(history)
-		log.Printf("%s: Respond to request %s with history: %v.\n", r.RemoteAddr, r.URL.Path, history)
+		json.NewEncoder(w).Encode(QueryHistory)
+		log.Printf("%s: Respond to request %s with history: %v.\n", r.RemoteAddr, r.URL.Path, QueryHistory)
 
 	}
 }
@@ -277,7 +281,6 @@ func main() {
 
 	dbConStr := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=disable", dbHost, dbPort, dbName, dbUser, dbPassword)
 	log.Println("Establishing database connection.")
-
 	for i := 1; i <= 5; i++ {
 		db, err = sql.Open("postgres", dbConStr)
 		if err != nil {
