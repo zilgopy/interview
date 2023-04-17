@@ -110,18 +110,9 @@ jobs:
       run: |
         echo "::set-output name=tag_name::${GITHUB_REF/refs\/tags\//}"
 
-    - name: Install yq
-      run: |
-        sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.6.3/yq_linux_amd64
-        sudo chmod +x /usr/local/bin/yq
-    - name: Update values.yaml
-      run: |
-        yq eval -i '.app.image.tag = ${{ steps.tag_name.outputs.tag_name }}' helm-interview/values.yaml
-
     - name: Package Helm chart
       id: package
       run: |
-        
         helm package helm-interview
         echo "::set-output name=chart_path::$(ls *.tgz)"
 
