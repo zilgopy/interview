@@ -1,9 +1,6 @@
 name: CI Pipeline
 
-on:
-  push:
-    tags:
-      - "*"
+on: [push]
 
 jobs:
   test-and-lint:
@@ -60,6 +57,33 @@ jobs:
         DB_NAME: interview
         DB_USER: zhong
         DB_PASSWORD: p@ssword
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Docker
+      uses: docker-practice/actions-setup-docker@v1
+
+    - name: Install Docker Compose
+      run: |
+        sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        docker-compose --version
+
+    - name: Install curl
+      run: |
+        sudo apt-get install -y curl
+
+    - name: Run tests with Docker Compose
+      run: |
+        docker-compose up -d --build
+        sleep 3
+        curl localhost:3000/health
+        docker-compose down
 
   build-docker-image:
     runs-on: ubuntu-latest
