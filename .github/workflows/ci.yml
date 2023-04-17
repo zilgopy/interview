@@ -111,7 +111,7 @@ jobs:
         sudo chmod +x /usr/local/bin/yq
     - name: Update values.yaml
       run: |
-        yq eval -i '.image.tag = ${{ steps.tag_name.outputs.tag_name }}' helm-interview/values.yaml
+        yq eval -i '.app.image.tag = ${{ steps.tag_name.outputs.tag_name }}' helm-interview/values.yaml
 
     - name: Package Helm chart
       id: package
