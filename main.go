@@ -34,11 +34,21 @@ type rootResponse struct {
 	Kubernetes bool   `json:"kubernetes"`
 }
 
+type httpError struct {
+	Message string `json:"message"`
+}
+
 func RootHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Received %s %s root request from %s.\n", r.Method, r.URL.Path, r.RemoteAddr)
-
 	w.Header().Set("Content-Type", "application/json")
+	if r.Method != http.MethodGet {
+		msg := httpError{Message: "Method not allowed"}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(msg)
+		log.Printf("%s: Only GET method is allowed on this api endpoint.\n", r.RemoteAddr)
+		return
+	}
 
 	response := rootResponse{
 		Version:    version,
@@ -62,26 +72,30 @@ type ValidateIPResponse struct {
 
 func validateIPHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Received %s %s validate request from %s.\n", r.Method, r.URL.Path, r.RemoteAddr)
+	w.Header().Set("Content-Type", "application/json")
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusBadRequest)
+
+		msg := httpError{Message: "Method not allowed"}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(msg)
 		log.Printf("%s: Only POST method is allowed on this api endpoint.\n", r.RemoteAddr)
 		return
+
 	}
 
 	var request ValidateIPRequest
 	err := json.NewDecoder(r.Body).Decode(&request)
 	if err != nil {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		msg := httpError{Message: "The requested resource was not a valid json."}
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(msg)
 		log.Printf("%s: %s is not a valid json file.\n", request, r.RemoteAddr)
-
 		return
 	}
 
 	response := ValidateIPResponse{
 		Status: net.ParseIP(request.IP).To4() != nil,
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
 	log.Printf("%s: Respond to validate request %s with response %v.\n", r.RemoteAddr, r.URL.Path, response)
@@ -105,24 +119,30 @@ func lookupHandler(db *sql.DB) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received %s %s lookup request from %s.\n", r.Method, r.URL.Path, r.RemoteAddr)
+		w.Header().Set("Content-Type", "application/json")
 
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusBadRequest)
+			msg := httpError{Message: "Method not allowed"}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: Only GET method is allowed on this api endpoint.\n", r.RemoteAddr)
 			return
 		}
 
 		domain := r.URL.Query().Get("domain")
 		if domain == "" {
-			http.Error(w, "Bad request: missing domain", http.StatusBadRequest)
+			msg := httpError{Message: "Bad request: missing domain"}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: please specify correct domain in query string.\n", r.RemoteAddr)
-
 			return
 		}
 
 		ips, err := net.DefaultResolver.LookupIP(context.Background(), "ip4", domain)
 		if err != nil {
-			http.Error(w, "Failed to resolve domain,Please check if the domain is correct.", http.StatusNotFound)
+			msg := httpError{Message: "Failed to resolve domain,Please check if the domain is correct."}
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: Failed to resolve domain %s with error %s\n", domain, r.RemoteAddr, err)
 			return
 		}
@@ -138,13 +158,15 @@ func lookupHandler(db *sql.DB) http.HandlerFunc {
 		_, err = db.Exec(`INSERT INTO query_history (domain, client_ip, addresses, created_at) VALUES ($1, $2, $3, to_timestamp($4))`, domain, clientIP, addressJson, createdAt)
 
 		if err != nil {
-			http.Error(w, "Failed to save query to the database", http.StatusInternalServerError)
+
+			msg := httpError{Message: "Failed to save query to the database."}
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: Inserting database entry failed with error %s.\n", r.RemoteAddr, err)
 			return
 		}
 		log.Printf("%s: Inserted database entry successfully\n", r.RemoteAddr)
 
-		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(response)
 		log.Printf("%s: Respond to request %s with lookup response %s.\n", r.RemoteAddr, r.URL.Path, response)
@@ -154,15 +176,22 @@ func lookupHandler(db *sql.DB) http.HandlerFunc {
 func historyHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Received %s %s request from %s.\n", r.Method, r.URL.Path, r.RemoteAddr)
+
+		w.Header().Set("Content-Type", "application/json")
 		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusBadRequest)
+			msg := httpError{Message: "Method not allowed"}
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: Only GET method is allowed on this api endpoint.\n", r.RemoteAddr)
 			return
 		}
 
 		rows, err := db.Query(`SELECT domain, client_ip, addresses, created_at FROM query_history ORDER BY created_at DESC LIMIT 20`)
 		if err != nil {
-			http.Error(w, "Failed to fetch query history", http.StatusInternalServerError)
+
+			msg := httpError{Message: "Failed to fetch query history from database."}
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(msg)
 			log.Printf("%s: fetch query history failed with error %s.\n", r.RemoteAddr, err)
 			return
 		}
@@ -175,7 +204,9 @@ func historyHandler(db *sql.DB) http.HandlerFunc {
 			t := time.Time{}
 			err := rows.Scan(&qh.Domain, &qh.ClientIP, &addressesJSON, &t)
 			if err != nil {
-				http.Error(w, "Failed to decode database row ", http.StatusInternalServerError)
+				msg := httpError{Message: "Failed to decode database row."}
+				w.WriteHeader(http.StatusInternalServerError)
+				json.NewEncoder(w).Encode(msg)
 				log.Printf("%s: Failed to decode database row with error %s.\n", r.RemoteAddr, err)
 				return
 			}
@@ -185,10 +216,14 @@ func historyHandler(db *sql.DB) http.HandlerFunc {
 
 		}
 		if err = rows.Err(); err != nil {
-			http.Error(w, "Failed to fetch query history", http.StatusInternalServerError)
+
+			msg := httpError{Message: "Failed to fetch query history from database."}
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(msg)
+			log.Printf("%s: fetch query history failed with error %s.\n", r.RemoteAddr, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
+
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(history)
 		log.Printf("%s: Respond to request %s with history: %v.\n", r.RemoteAddr, r.URL.Path, history)
