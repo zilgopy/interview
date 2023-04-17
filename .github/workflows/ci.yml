@@ -105,6 +105,11 @@ jobs:
       run: |
         helm lint helm-interview
 
+    - name: Extract tag name
+      id: tag_name
+      run: |
+        echo "::set-output name=tag_name::${GITHUB_REF/refs\/tags\//}"
+
     - name: Install yq
       run: |
         sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.6.3/yq_linux_amd64
