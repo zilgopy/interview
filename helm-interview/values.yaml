@@ -3,7 +3,7 @@ app:
   replicaCount: 1
   image:
     repository: zilgopy/interview
-    tag: v1.0
+    tag: ""
   service:
     type: NodePort
     port: 3000

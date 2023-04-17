@@ -78,12 +78,17 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+    - name: Extract tag name
+      id: tag_name
+      run: |
+        echo "::set-output name=tag_name::${GITHUB_REF/refs\/tags\//}"
+
     - name: Build and push Docker image
       uses: docker/build-push-action@v2
       with:
         context: .
         push: true
-        tags: zilgopy/interview:${{ github.sha }}
+        tags: zilgopy/interview:${{ steps.tag_name.outputs.tag_name }}
 
   package-helm-chart:
     runs-on: ubuntu-latest
@@ -100,9 +105,21 @@ jobs:
       run: |
         helm lint helm-interview
 
-    - name: Package Helm chart
+    - name: Install yq
       run: |
+        sudo wget -O /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.6.3/yq_linux_amd64
+        sudo chmod +x /usr/local/bin/yq
+    - name: Update values.yaml
+      run: |
+        yq eval -i '.image.tag = ${{ steps.tag_name.outputs.tag_name }}' helm-interview/values.yaml
+
+    - name: Package Helm chart
+      id: package
+      run: |
+        
         helm package helm-interview
+        echo "::set-output name=chart_path::$(ls *.tgz)"
+
 
     - name: Create Release
       id: create_release
@@ -110,11 +127,10 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        tag_name: ${{ steps.tag_name.outputs.tag_name }}
+        release_name: Release ${{ steps.tag_name.outputs.tag_name }}
         draft: false
         prerelease: false
-
 
     - name: Upload Helm chart to Release
       uses: actions/upload-release-asset@v1
@@ -125,4 +141,3 @@ jobs:
         asset_path: ${{ steps.package.outputs.chart_path }}
         asset_name: ${{ steps.package.outputs.chart_path }}
         asset_content_type: application/x-tar
-
