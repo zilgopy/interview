@@ -115,25 +115,3 @@ jobs:
       run: |
         helm package helm-interview
         echo "::set-output name=chart_path::$(ls *.tgz)"
-
-
-    - name: Create Release
-      id: create_release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.ci_release_token }}
-      with:
-        tag_name: ${{ steps.tag_name.outputs.tag_name }}
-        release_name: Release ${{ steps.tag_name.outputs.tag_name }}
-        draft: false
-        prerelease: false
-
-    - name: Upload Helm chart to Release
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.ci_release_token }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ${{ steps.package.outputs.chart_path }}
-        asset_name: ${{ steps.package.outputs.chart_path }}
-        asset_content_type: application/x-tar
